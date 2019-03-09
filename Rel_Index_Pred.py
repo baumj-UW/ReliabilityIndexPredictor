@@ -1,25 +1,33 @@
 '''
 Created on Mar 7, 2019
-
+ 
 @author: baumj
 
-The goal of this project is to develop a regression model that predicts the annual System Average
-Interruption Duration Index (SAIDI) and System Average Interruption Frequency Index (SAIFI) of
-different utilities across the United States based on data published by the Energy Information
-Administration (EIA). As the index names suggest, SAIDI and SAIFI are key metrics of a utility’s
-reliability performance and their forecasted values could be useful for system planning and evaluation.
-
-To generate a model, data from the “Electric power sales, revenue, and efficiency Form EIA-861”
-collection of utility statistics from 2012 through 2017 will be aggregated and processed. The Form EIA-
-861 surveys over 1,000 utilities in the U.S. on operational information such as region, distribution
-management, and energy market interaction, and has reported annual SAIDI and SAIFI information since
-2013 [1]. The data will be split by year for training and test; 2012-2014 will be used for training, 2015
-for tuning and validation, and 2016-2017 for test. Initial investigation of this data source was influenced
-by an Inside Energy article [2] which summarized the SAIDI and SAIFI statistics after their first year of
-publication.
-
-[1] U.S. Energy Information Administration, "Electric power sales, revenue, and energy efficiency Form EIA-861
-detailed data files," 2019. [Online]. Available: https://www.eia.gov/electricity/data/eia861/.
+SAIDI SAIFI Index Predictor 
 '''
 
-import numpy as np 
+import numpy as np
+from sklearn import metrics, linear_model
+import matplotlib.pyplot as plt 
+from sklearn.preprocessing import OneHotEncoder
+from sklearn import preprocessing
+import pandas as pd
+
+year = ["2013","2014","2015","2016","2017"]
+dpath = "C:/Users/baumj/Documents/UW Courses/EE 511 - Intro to Statistical Learning/Project/EIA_Data/"
+fname = ["/Reliability_","/Operational_Data_"]
+ext = {"2013":".xls","2014":".xls","2015":".xlsx","2016":".xlsx","2017":".xlsx"}
+
+#save data files from each year in common format 
+allfiles = {} #Create dict of file paths for data from each year
+alldata = {} #Create dict of dataframes from each year data
+for i in year:
+    allfiles[i] = {'rel':(dpath+ i +"/Reliability_"+ i +ext[i]), \
+                   'ops':(dpath+ i +"/Operational_Data_"+ i +ext[i])}
+    alldata[i] = {'rel': (pd.read_excel(allfiles[i]['rel'],sheet_name="RELIABILITY_States",index_col=1,header=1)), \
+                  'ops': (pd.read_excel(allfiles[i]['ops'],sheet_name="States",index_col=1,header=2))}
+
+#Import Reliability data 
+
+#f13_ops.loc[df13.index,'Net Generation']
+model = linear_model
