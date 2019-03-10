@@ -40,14 +40,15 @@ to heuristically predict the current year's values
 '''
 #Get regions averages
 reg_avg = {} 
-for i in year:
+for i in year:  #figure out how to get rid of "object" dtype
     
-    regions = alldata['2013']['ops'].groupby(by='NERC Region')
+    regions = alldata[i]['ops'].groupby(by='NERC Region')
     year_reg_avg = {}
     for region in regions.groups:
         region_index = regions.groups[region].values #indices for given region
-        sample_overlap = alldata['2013']['rel']['SAIDI With MED'].index.intersection(region_index)
-        year_reg_avg[region] = np.nanmean(alldata['2013']['rel'].loc[sample_overlap,'SAIDI With MED'].values)
+        sample_overlap = alldata[i]['rel']['SAIDI With MED'].index.intersection(region_index)
+        year_reg_avg[region] = np.nanmean(alldata[i]['rel'].loc[sample_overlap,\
+                                                                'SAIDI With MED'].values)
     
     reg_avg[i] = year_reg_avg.copy()   
 #f13_ops.loc[df13.index,'Net Generation']
