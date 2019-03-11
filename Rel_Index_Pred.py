@@ -25,9 +25,11 @@ for i in year:
     allfiles[i] = {'rel':(dpath+ i +"/Reliability_"+ i +ext[i]), \
                    'ops':(dpath+ i +"/Operational_Data_"+ i +ext[i])}
     alldata[i] = {'rel': (pd.read_excel(allfiles[i]['rel'],sheet_name="RELIABILITY_States",\
-                                        index_col=1,header=1, na_values =['.'], skipfooter=1)), \
+                                        index_col=1,header=1, na_values =['.',' '], skipfooter=1,\
+                                        dtype={'Utility Number':np.int})), \
                   'ops': (pd.read_excel(allfiles[i]['ops'],sheet_name="States",na_values =['.'],\
-                                        index_col=1,header=2))}
+                                        index_col=1,header=2, dtype={'Utility Number':np.int, \
+                                                                     'NERC Region':np.str}))}
 
 #Clean up missing data
 for i in year:
