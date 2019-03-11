@@ -34,6 +34,7 @@ for i in year:
 #Clean up missing data
 for i in year:
     alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
+    alldata[i]['ops']['NERC Region'].fillna('Unknown',inplace=True)
 
 ''' 
 Get Baseline Predictor:
@@ -42,17 +43,37 @@ to heuristically predict the current year's values
 '''
 #Get regions averages
 reg_avg = {} 
+regions = {}
 for i in year:  #figure out how to get rid of "object" dtype
     
-    regions = alldata[i]['ops'].groupby(by='NERC Region')
+    regions[i] = alldata[i]['ops'].groupby(by='NERC Region')
     year_reg_avg = {}
-    for region in regions.groups:
-        region_index = regions.groups[region].values #indices for given region
+    for region in regions[i].groups:
+        region_index = regions[i].groups[region].values #indices for given region
         sample_overlap = alldata[i]['rel']['SAIDI With MED'].index.intersection(region_index)
         year_reg_avg[region] = np.nanmean(alldata[i]['rel'].loc[sample_overlap,\
                                                                 'SAIDI With MED'].values)
     
     reg_avg[i] = year_reg_avg.copy()   
+    
+# Get RMSE for heuristic prediction
+heur_pred = {}
+keys13 = alldata['2013']['rel']['SAIDI With MED'].index
+keys14 = alldata['2014']['rel']['SAIDI With MED'].index
+keys14 = keys14.intersection(alldata['2014']['ops']['NERC Region'].index)
+# heur_pred.fromkeys(alldata['2013']['rel']['SAIDI With MED'].index, \
+#                    reg_avg['2013'][alldata['2013']['ops'].loc[97,'NERC Region']]) #returns avg value from region
+pred_arr14 = np.zeros((len(keys14)))
+for (i,key) in enumerate(keys14):
+    pred_arr14[i] = (reg_avg['2014'][alldata['2014']['ops'].loc[key,'NERC Region']])
+
+# this (below) overwrites repeated keys     
+#heur_pred = {key: (reg_avg['2013'][alldata['2013']['ops'].loc[key,'NERC Region']]) for key in keys }
+
+actual = alldata['2014']['rel']['SAIDI With MED'].fillna(0)
+metrics.mean_squared_error(actual.values.reshape(-1,1),pred_arr13) #393822.86967195437
+metrics.mean_squared_error(actual.loc[keys14].values,pred_arr14)
+
 #f13_ops.loc[df13.index,'Net Generation']
 alldata['2013']['rel'].loc[:,'SAIDI With MED']
 model = linear_model.LinearRegression()
@@ -64,7 +85,7 @@ overlap = (alldata['2013']['ops'].index).intersection(alldata['2013']['rel'].ind
 data = alldata['2013']['ops'].loc[overlap,'Total'].fillna(0)
 #actual = alldata['2013']['rel'].loc[:,'SAIDI With MED'].fillna(0)
 actual = alldata['2013']['rel']['SAIDI With MED'].fillna(alldata['2013']['rel']['SAIDI With MED.1'])
-actual = actual.fillna
+actual = actual.fillna(0)
 model.fit(data.values.reshape(-1,1),actual.values.reshape(-1,1))
 x = np.array([0,1e8]).reshape(-1,1)
 plt.plot(data.values,actual.values,'x')
