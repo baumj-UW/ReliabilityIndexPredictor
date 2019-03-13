@@ -46,10 +46,28 @@ Results:
 '''
 #Create vector of features for 2014 prediction
 # results 
-# alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
-# temp_ops = alldata['2013']['ops'].set_index(['Utility Name','State'])
-# temp_ops.loc[temp['SAIDI With MED'].index,:]
-# 
+
+clean_res = {}
+features = ['Ownership Type','NERC Region', 'Total', 'Total Sources']
+for i in year:
+    clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),'SAIDI With MED'] #only keep indices samples that have results
+    clean_data[features] = alldata[i]['ops'].loc[clean_data.index,features].copy()
+    clean_res[i] = clean_data.copy()
+    
+    
+#create df of "actual" SAIDI values which will be predicted with features 
+clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),'SAIDI With MED'] #only keep indices samples that have results
+
+#list of features to include in data vector
+features = ['Ownership Type','NERC Region', 'Total', 'Total Sources']
+#Add "features" from previous year
+clean_data[['Ownership Type','NERC Region']] = alldata[i-1]['ops'].loc[clean_data.index,slice('Ownership Type','NERC Region')].copy()
+clean_data[features] = alldata[i]['ops'].loc[clean_data.index,features].copy()
+
+alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
+temp_ops = alldata['2013']['ops'].set_index(['Utility Name','State'])
+temp_ops.loc[temp['SAIDI With MED'].index,:]
+ 
 # alldata['2014']['rel'].loc[(slice(None),'WA'),:]
 ''' 
 Get Baseline Predictor:
