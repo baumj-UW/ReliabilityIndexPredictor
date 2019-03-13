@@ -25,10 +25,10 @@ for i in year:
     allfiles[i] = {'rel':(dpath+ i +"/Reliability_"+ i +ext[i]), \
                    'ops':(dpath+ i +"/Operational_Data_"+ i +ext[i])}
     alldata[i] = {'rel': (pd.read_excel(allfiles[i]['rel'],sheet_name="RELIABILITY_States",\
-                                        index_col=1,header=1, na_values =['.',' '], skipfooter=1,\
+                                        index_col=[1,3],header=1, na_values =['.',' '], skipfooter=1,\
                                         dtype={'Utility Number':np.int})), \
                   'ops': (pd.read_excel(allfiles[i]['ops'],sheet_name="States",na_values =['.'],\
-                                        index_col=1,header=2, dtype={'Utility Number':np.int, \
+                                        index_col=[1,3],header=2, dtype={'Utility Number':np.int, \
                                                                      'NERC Region':np.str}))}
 
 #Clean up missing data
@@ -36,6 +36,21 @@ for i in year:
     alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
     alldata[i]['ops']['NERC Region'].fillna('Unknown',inplace=True)
 
+'''
+Set up data as vectors of features
+Inputs:
+   - Current year - Utility Name, NERC Region
+   - Previous year - SAIDI/SAIFI reports, Net Generation, Customers, 
+Results:
+   - Current year - SAIDI With MED 
+'''
+#Create vector of features for 2014 prediction
+# results 
+# alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
+# temp_ops = alldata['2013']['ops'].set_index(['Utility Name','State'])
+# temp_ops.loc[temp['SAIDI With MED'].index,:]
+# 
+# alldata['2014']['rel'].loc[(slice(None),'WA'),:]
 ''' 
 Get Baseline Predictor:
 Use utility region's average SAIDI and SAIFI values from the previous year
@@ -51,7 +66,8 @@ for i in year:  #figure out how to get rid of "object" dtype
     for region in regions[i].groups:
         region_index = regions[i].groups[region].values #indices for given region
         sample_overlap = alldata[i]['rel']['SAIDI With MED'].index.intersection(region_index)
-        year_reg_avg[region] = np.nanmean(alldata[i]['rel'].loc[sample_overlap,\
+        if(sample_overlap.size>0):
+            year_reg_avg[region] = np.nanmean(alldata[i]['rel'].loc[sample_overlap,\
                                                                 'SAIDI With MED'].values)
     
     reg_avg[i] = year_reg_avg.copy()   
