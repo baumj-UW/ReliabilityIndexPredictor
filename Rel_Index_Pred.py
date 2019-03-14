@@ -62,13 +62,19 @@ feat_year = ["2012","2013","2014","2015","2016"]
 pred_year = ["2013","2014","2015","2016","2017"]
 clean_res = {}
 features = ['Ownership Type','NERC Region', 'Total', 'Total Sources']
-for i in enumerate(pred_year):
-    clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),\
-                                       ['SAIDI With MED','SAIFI With MED']] #only keep indices samples that have results
+for i,yr in enumerate(pred_year):
+    clean_data = alldata[yr]['rel'].\
+    loc[np.isfinite(alldata[yr]['rel']['SAIDI With MED']),\
+        ['SAIDI With MED','SAIFI With MED']] #only keep indices samples that have results
     for feat in features:
-        clean_data[feat] = alldata[i]['ops'].loc[clean_data.index,feat]
-    clean_res[i] = clean_data.copy()
- 
+        clean_data[feat] = alldata[feat_year[i]]['ops'].loc[clean_data.index,feat]
+    clean_res[yr] = clean_data.copy()
+# for i in enumerate(pred_year):
+#     clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),\
+#                                        ['SAIDI With MED','SAIFI With MED']] #only keep indices samples that have results
+#     for feat in features:
+#         clean_data[feat] = alldata[i]['ops'].loc[clean_data.index,feat]
+#     clean_res[i] = clean_data.copy() 
 #Add "features" from previous year
 ##clean_data[['Ownership Type','NERC Region']] = alldata[i-1]['ops'].loc[clean_data.index,slice('Ownership Type','NERC Region')].copy()
 
@@ -77,6 +83,16 @@ for i in enumerate(pred_year):
 # temp_ops.loc[temp['SAIDI With MED'].index,:]
 #  
 # alldata['2014']['rel'].loc[(slice(None),'WA'),:]
+'''
+Super Simple Baseline Predictor: predict average value from prev. year
+'''
+val_actual = clean_res['2015'].loc[:,'SAIDI With MED']
+prev_avg = np.average(clean_res['2014'].loc[:,'SAIDI With MED'])
+worst = prev_avg*np.ones(val_actual.shape)
+basic_MSE = metrics.mean_squared_error(val_actual.values.reshape(-1,1), worst)
+
+print("Worst case MSE:",basic_MSE)
+
 ''' 
 Get Baseline Predictor:
 Use utility region's average SAIDI and SAIFI values from the previous year
@@ -116,21 +132,24 @@ actual = alldata['2014']['rel']['SAIDI With MED'].fillna(0)
 metrics.mean_squared_error(actual.values.reshape(-1,1),pred_arr13) #393822.86967195437
 metrics.mean_squared_error(actual.loc[keys14].values,pred_arr14)
 
+
+
 '''
 Run linear reg with simple predictor
 Set nan values to zero
 '''
-data = clean_res['2013'].loc[clean_res['2014'].index,'Total Sources'].fillna(0)
-actual = clean_res['2014'].loc[:,'SAIDI With MED']
+data = clean_res['2013'].loc[:,'Total Sources'].fillna(0)
+actual = clean_res['2013'].loc[:,'SAIDI With MED']
 
 model = linear_model.LinearRegression()
 model.fit(data.values.reshape(-1,1),actual.values.reshape(-1,1))
 
-val_data = clean_res['2014'].loc[clean_res['2015'].index,'Total Sources'].fillna(0)
+val_data = clean_res['2015'].loc[:,'Total Sources'].fillna(0)
 val_actual = clean_res['2015'].loc[:,'SAIDI With MED']
 val_pred = model.predict(val_data.values.reshape(-1,1))
 
 metrics.mean_squared_error(val_actual.values.reshape(-1,1), val_pred)
+# 235776.6370881481
 
 
 
