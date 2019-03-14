@@ -16,7 +16,7 @@ import pandas as pd
 year = ["2013","2014","2015","2016","2017"]
 dpath = "C:/Users/baumj/Documents/UW Courses/EE 511 - Intro to Statistical Learning/Project/EIA_Data/"
 fname = ["/Reliability_","/Operational_Data_"]
-ext = {"2013":".xls","2014":".xls","2015":".xlsx","2016":".xlsx","2017":".xlsx"}
+ext = {"2012":".xls","2013":".xls","2014":".xls","2015":".xlsx","2016":".xlsx","2017":".xlsx"}
 
 #Import Reliability data 
 allfiles = {} #Create dict of file paths for data from each year
@@ -30,8 +30,18 @@ for i in year:
                   'ops': (pd.read_excel(allfiles[i]['ops'],sheet_name="States",na_values =['.'],\
                                         index_col=[1,3],header=2, dtype={'Utility Number':np.int, \
                                                                      'NERC Region':np.str}))}
+#repeat for 2012 but skip rel data
+i="2012"
+allfiles[i] = {'ops':(dpath+ i +"/Operational_Data_"+ i +ext[i])}
+alldata[i] = {'ops': (pd.read_excel(allfiles[i]['ops'], sheet_name="States",\
+                                         na_values =['.'],index_col=[1,3],header=2,\
+                                         dtype={'Utility Number':np.int,'NERC Region':np.str}))}
+
+
 
 #Clean up missing data
+# try swapping indexing with .loc to speedup
+#need to add check for if the data exists
 for i in year:
     alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
     alldata[i]['ops']['NERC Region'].fillna('Unknown',inplace=True)
@@ -47,34 +57,32 @@ Results:
 #Create vector of features for 2014 prediction
 # results 
 
+#Loop creates dict of cleaned up results for each year where SAIDI values exist and combines with data from ops file
+feat_year = ["2012","2013","2014","2015","2016"]
+pred_year = ["2013","2014","2015","2016","2017"]
 clean_res = {}
 features = ['Ownership Type','NERC Region', 'Total', 'Total Sources']
-for i in year:
-    clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),'SAIDI With MED'] #only keep indices samples that have results
-    clean_data[features] = alldata[i]['ops'].loc[clean_data.index,features].copy()
+for i in enumerate(pred_year):
+    clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),\
+                                       ['SAIDI With MED','SAIFI With MED']] #only keep indices samples that have results
+    for feat in features:
+        clean_data[feat] = alldata[i]['ops'].loc[clean_data.index,feat]
     clean_res[i] = clean_data.copy()
-    
-    
-#create df of "actual" SAIDI values which will be predicted with features 
-clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),'SAIDI With MED'] #only keep indices samples that have results
-
-#list of features to include in data vector
-features = ['Ownership Type','NERC Region', 'Total', 'Total Sources']
-#Add "features" from previous year
-clean_data[['Ownership Type','NERC Region']] = alldata[i-1]['ops'].loc[clean_data.index,slice('Ownership Type','NERC Region')].copy()
-clean_data[features] = alldata[i]['ops'].loc[clean_data.index,features].copy()
-
-alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
-temp_ops = alldata['2013']['ops'].set_index(['Utility Name','State'])
-temp_ops.loc[temp['SAIDI With MED'].index,:]
  
+#Add "features" from previous year
+##clean_data[['Ownership Type','NERC Region']] = alldata[i-1]['ops'].loc[clean_data.index,slice('Ownership Type','NERC Region')].copy()
+
+# alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
+# temp_ops = alldata['2013']['ops'].set_index(['Utility Name','State'])
+# temp_ops.loc[temp['SAIDI With MED'].index,:]
+#  
 # alldata['2014']['rel'].loc[(slice(None),'WA'),:]
 ''' 
 Get Baseline Predictor:
 Use utility region's average SAIDI and SAIFI values from the previous year
 to heuristically predict the current year's values
 '''
-#Get regions averages
+#Get regions averages --> can probably change this to use the cleaned up data version 
 reg_avg = {} 
 regions = {}
 for i in year:  #figure out how to get rid of "object" dtype
@@ -107,6 +115,24 @@ for (i,key) in enumerate(keys14):
 actual = alldata['2014']['rel']['SAIDI With MED'].fillna(0)
 metrics.mean_squared_error(actual.values.reshape(-1,1),pred_arr13) #393822.86967195437
 metrics.mean_squared_error(actual.loc[keys14].values,pred_arr14)
+
+'''
+Run linear reg with simple predictor
+Set nan values to zero
+'''
+data = clean_res['2013'].loc[clean_res['2014'].index,'Total Sources'].fillna(0)
+actual = clean_res['2014'].loc[:,'SAIDI With MED']
+
+model = linear_model.LinearRegression()
+model.fit(data.values.reshape(-1,1),actual.values.reshape(-1,1))
+
+val_data = clean_res['2014'].loc[clean_res['2015'].index,'Total Sources'].fillna(0)
+val_actual = clean_res['2015'].loc[:,'SAIDI With MED']
+val_pred = model.predict(val_data.values.reshape(-1,1))
+
+metrics.mean_squared_error(val_actual.values.reshape(-1,1), val_pred)
+
+
 
 #f13_ops.loc[df13.index,'Net Generation']
 alldata['2013']['rel'].loc[:,'SAIDI With MED']
