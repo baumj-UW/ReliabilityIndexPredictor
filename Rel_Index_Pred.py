@@ -9,9 +9,10 @@ SAIDI SAIFI Index Predictor
 import numpy as np
 from sklearn import metrics, linear_model
 import matplotlib.pyplot as plt 
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from sklearn import preprocessing
 import pandas as pd
+from sklearn.cluster.spectral import discretize
 
 year = ["2013","2014","2015","2016","2017"]
 dpath = "C:/Users/baumj/Documents/UW Courses/EE 511 - Intro to Statistical Learning/Project/EIA_Data/"
@@ -38,13 +39,17 @@ alldata[i] = {'ops': (pd.read_excel(allfiles[i]['ops'], sheet_name="States",\
                                          dtype={'Utility Number':np.int,'NERC Region':np.str}))}
 
 
-
+feat_year = ["2012","2013","2014","2015","2016"]
+pred_year = ["2013","2014","2015","2016","2017"]
 #Clean up missing data
 # try swapping indexing with .loc to speedup
 #need to add check for if the data exists
-for i in year:
+discrete_vars = ['Ownership Type','NERC Region']
+for i in pred_year:
     alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
-    alldata[i]['ops']['NERC Region'].fillna('Unknown',inplace=True)
+    
+for i in feat_year:    
+    alldata[i]['ops'].loc[slice(None),discrete_vars].fillna('Unknown',inplace=True)
 
 '''
 Set up data as vectors of features
@@ -58,8 +63,7 @@ Results:
 # results 
 
 #Loop creates dict of cleaned up results for each year where SAIDI values exist and combines with data from ops file
-feat_year = ["2012","2013","2014","2015","2016"]
-pred_year = ["2013","2014","2015","2016","2017"]
+
 clean_res = {}
 features = ['Ownership Type','NERC Region', 'Total', 'Total Sources']
 for i,yr in enumerate(pred_year):
@@ -69,6 +73,23 @@ for i,yr in enumerate(pred_year):
     for feat in features:
         clean_data[feat] = alldata[feat_year[i]]['ops'].loc[clean_data.index,feat]
     clean_res[yr] = clean_data.copy()
+    
+
+#handle categories (uses code method from HW2 solutions)
+#need to convert categories before data split 
+vectors = []
+names = []
+for var in discrete_vars:
+    encoder = LabelEncoder()
+    X  = encoder.fit_transform(clean_res["2013"][var].fillna("Unknown")) #need to figure out why fillna above isn't sticking
+    vectors.append(X)
+    names += [(var+'_'+cat) for cat in encoder.classes_]
+
+encoder = OneHotEncoder()
+X = encoder.fit_transform(np.array(vectors).T)
+df_disc = pd.DataFrame(X.todense(),columns=names) #combine this df with clean_res
+
+
 # for i in enumerate(pred_year):
 #     clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),\
 #                                        ['SAIDI With MED','SAIFI With MED']] #only keep indices samples that have results
@@ -176,6 +197,13 @@ print("Simple Reg case MSE:",basic_MSE)
 # 235773.4963535127
 
 '''
+Convert categorical data to one-hot vectors 
+and include in training set
+
+'''
+
+print("Finished yet?")
+'''
 Extra tests  and code
 
 #f13_ops.loc[df13.index,'Net Generation']
@@ -194,3 +222,4 @@ model.fit(data.values.reshape(-1,1),actual.values.reshape(-1,1))
 x = np.array([0,1e8]).reshape(-1,1)
 plt.plot(data.values,actual.values,'x')
 plt.xscale("log")
+'''
