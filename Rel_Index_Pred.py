@@ -98,6 +98,7 @@ Get Baseline Predictor:
 Use utility region's average SAIDI and SAIFI values from the previous year
 to heuristically predict the current year's values
 '''
+'''
 #Get regions averages --> can probably change this to use the cleaned up data version 
 reg_avg = {} 
 regions = {}
@@ -131,7 +132,7 @@ for (i,key) in enumerate(keys14):
 actual = alldata['2014']['rel']['SAIDI With MED'].fillna(0)
 metrics.mean_squared_error(actual.values.reshape(-1,1),pred_arr13) #393822.86967195437
 metrics.mean_squared_error(actual.loc[keys14].values,pred_arr14)
-
+'''
 
 
 '''
@@ -148,10 +149,34 @@ val_data = clean_res['2015'].loc[:,'Total Sources'].fillna(0)
 val_actual = clean_res['2015'].loc[:,'SAIDI With MED']
 val_pred = model.predict(val_data.values.reshape(-1,1))
 
-metrics.mean_squared_error(val_actual.values.reshape(-1,1), val_pred)
+basic_MSE = metrics.mean_squared_error(val_actual.values.reshape(-1,1), val_pred)
+print("Simple Reg case MSE:",basic_MSE)
 # 235776.6370881481
 
+'''
+Run linear reg with simple predictor v2
+Set nan values to zero
+'''
+#features = ['Ownership Type','NERC Region', 'Total', 'Total Sources'] <-- use all features 
+#combine training data sets 
+data = clean_res['2013'].loc[:,['Total', 'Total Sources']].fillna(0).\
+append(clean_res['2014'].loc[:,['Total', 'Total Sources']].fillna(0))
+actual = clean_res['2013'].loc[:,'SAIDI With MED'].\
+append(clean_res['2014'].loc[:,'SAIDI With MED'])
 
+model = linear_model.LinearRegression(normalize=True)
+model.fit(data.values,actual.values)
+
+val_data = clean_res['2015'].loc[:,['Total', 'Total Sources']].fillna(0)
+val_actual = clean_res['2015'].loc[:,'SAIDI With MED']
+val_pred = model.predict(val_data.values)
+
+basic_MSE = metrics.mean_squared_error(val_actual.values, val_pred)
+print("Simple Reg case MSE:",basic_MSE)
+# 235773.4963535127
+
+'''
+Extra tests  and code
 
 #f13_ops.loc[df13.index,'Net Generation']
 alldata['2013']['rel'].loc[:,'SAIDI With MED']
