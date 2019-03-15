@@ -85,20 +85,24 @@ names = []
 #     vectors.append(X)
 #     names += [(var+'_'+cat) for cat in encoder.classes_]
 
-
+#this should just do the fit based on known categories
 hotenc = OneHotEncoder(handle_unknown='ignore')
 X = hotenc.fit_transform(clean_res["2013"][discrete_vars].fillna("Unknown").values)
 for (i,feat) in enumerate(hotenc.categories_):
     names += [(discrete_vars[i]+'_'+cat) for cat in feat]
 
-df_disc = pd.DataFrame(X.todense(),columns=names,index=clean_res["2013"].index) #combine this df with clean_res
-#test = 
-combo = pd.concat([clean_res["2013"],df_disc],axis=1,join_axes=[clean_res["2013"].index])
-combo = combo.drop(discrete_vars,axis=1)    
-temp2 = hotenc.transform(clean_res["2014"][['Ownership Type','NERC Region']].fillna("Unknown").values)
+# df_disc = pd.DataFrame(X.todense(),columns=names,index=clean_res["2013"].index) #combine this df with clean_res
+# #test = 
+# combo = pd.concat([clean_res["2013"],df_disc],axis=1,join_axes=[clean_res["2013"].index])
+# combo = combo.drop(discrete_vars,axis=1)    
+# temp2 = hotenc.transform(clean_res["2014"][['Ownership Type','NERC Region']].fillna("Unknown").values)
 
-
-
+for yr in clean_res:
+    X = hotenc.transform(clean_res[yr][discrete_vars].fillna("Unknown").values)
+    df_disc = pd.DataFrame(X.todense(),columns=names,index=clean_res[yr].index)
+    combo = pd.concat([clean_res[yr],df_disc],axis=1,join_axes=[clean_res[yr].index])
+    clean_res[yr] = combo.drop(discrete_vars,axis=1)   
+    
 
 # for i in enumerate(pred_year):
 #     clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),\
@@ -210,9 +214,22 @@ print("Simple Reg case MSE:",basic_MSE)
 Convert categorical data to one-hot vectors 
 and include in training set
 '''
+data = clean_res['2013'].iloc[:,2:].fillna(0).\
+append(clean_res['2014'].iloc[:,2:].fillna(0))
+actual = clean_res['2013'].loc[:,'SAIDI With MED'].\
+append(clean_res['2014'].loc[:,'SAIDI With MED'])
 
-data = combo.iloc[:,2:].fillna(0)
-actual = combo.loc[:,'SAIDI With MED']
+
+model = linear_model.LinearRegression(normalize=True)
+model.fit(data.values,actual.values)
+
+val_data = clean_res['2015'].iloc[:,2:].fillna(0)
+val_actual = clean_res['2015'].loc[:,'SAIDI With MED']
+val_pred = model.predict(val_data.values)
+
+val_MSE = metrics.mean_squared_error(val_actual.values, val_pred)
+print("Validation MSE:",val_MSE)  #Validation MSE: 230590.00718307553
+
 
 print("Finished yet?")
 '''
