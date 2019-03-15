@@ -76,18 +76,28 @@ for i,yr in enumerate(pred_year):
     
 
 #handle categories (uses code method from HW2 solutions)
-#need to convert categories before data split 
-vectors = []
-names = []
-for var in discrete_vars:
-    encoder = LabelEncoder()
-    X  = encoder.fit_transform(clean_res["2013"][var].fillna("Unknown")) #need to figure out why fillna above isn't sticking
-    vectors.append(X)
-    names += [(var+'_'+cat) for cat in encoder.classes_]
+#need to make a list of categories to convert
 
-encoder = OneHotEncoder()
-X = encoder.fit_transform(np.array(vectors).T)
-df_disc = pd.DataFrame(X.todense(),columns=names) #combine this df with clean_res
+names = []
+# for var in discrete_vars:
+#     encoder = LabelEncoder()
+#     X  = encoder.fit_transform(clean_res["2013"][var].fillna("Unknown")) #need to figure out why fillna above isn't sticking
+#     vectors.append(X)
+#     names += [(var+'_'+cat) for cat in encoder.classes_]
+
+
+hotenc = OneHotEncoder(handle_unknown='ignore')
+X = hotenc.fit_transform(clean_res["2013"][discrete_vars].fillna("Unknown").values)
+for (i,feat) in enumerate(hotenc.categories_):
+    names += [(discrete_vars[i]+'_'+cat) for cat in feat]
+
+df_disc = pd.DataFrame(X.todense(),columns=names,index=clean_res["2013"].index) #combine this df with clean_res
+#test = 
+combo = pd.concat([clean_res["2013"],df_disc],axis=1,join_axes=[clean_res["2013"].index])
+combo = combo.drop(discrete_vars,axis=1)    
+temp2 = hotenc.transform(clean_res["2014"][['Ownership Type','NERC Region']].fillna("Unknown").values)
+
+
 
 
 # for i in enumerate(pred_year):
@@ -199,8 +209,10 @@ print("Simple Reg case MSE:",basic_MSE)
 '''
 Convert categorical data to one-hot vectors 
 and include in training set
-
 '''
+
+data = combo.iloc[:,2:].fillna(0)
+actual = combo.loc[:,'SAIDI With MED']
 
 print("Finished yet?")
 '''
