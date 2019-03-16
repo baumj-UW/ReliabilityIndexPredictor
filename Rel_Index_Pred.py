@@ -16,7 +16,7 @@ from sklearn.cluster.spectral import discretize
 
 year = ["2013","2014","2015","2016","2017"]
 dpath = "C:/Users/baumj/Documents/UW Courses/EE 511 - Intro to Statistical Learning/Project/EIA_Data/"
-fname = ["/Reliability_","/Operational_Data_"]
+fname = ["/Reliability_","/Operational_Data_","/Distribution_Systems_"]
 ext = {"2012":".xls","2013":".xls","2014":".xls","2015":".xlsx","2016":".xlsx","2017":".xlsx"}
 
 #Import Reliability data 
@@ -24,19 +24,27 @@ allfiles = {} #Create dict of file paths for data from each year
 alldata = {} #Create dict of dataframes from each year data
 for i in year:
     allfiles[i] = {'rel':(dpath+ i +"/Reliability_"+ i +ext[i]), \
-                   'ops':(dpath+ i +"/Operational_Data_"+ i +ext[i])}
+                   'ops':(dpath+ i +"/Operational_Data_"+ i +ext[i]),\
+                   'dist_sys':(dpath + i+"/Distribution_Systems_" + i +ext[i])}
     alldata[i] = {'rel': (pd.read_excel(allfiles[i]['rel'],sheet_name="RELIABILITY_States",\
                                         index_col=[1,3],header=1, na_values =['.',' '], skipfooter=1,\
                                         dtype={'Utility Number':np.int})), \
                   'ops': (pd.read_excel(allfiles[i]['ops'],sheet_name="States",na_values =['.'],\
                                         index_col=[1,3],header=2, dtype={'Utility Number':np.int, \
-                                                                     'NERC Region':np.str}))}
+                                                                     'NERC Region':np.str})), \
+                  'dist_sys':(pd.read_excel(allfiles[i]['dist_sys'],sheet_name="Distribution_Systems_States",\
+                                            na_values =['.',' '],index_col=[1,3],header=1,\
+                                            dtype={'Utility Number':np.int}))}
 #repeat for 2012 but skip rel data
 i="2012"
-allfiles[i] = {'ops':(dpath+ i +"/Operational_Data_"+ i +ext[i])}
+allfiles[i] = {'ops':(dpath+ i +"/Operational_Data_"+ i +ext[i])}#\
+#               'dist_sys':(dpath + i+"/Distribution_Systems_" + i +ext[i])}
 alldata[i] = {'ops': (pd.read_excel(allfiles[i]['ops'], sheet_name="States",\
                                          na_values =['.'],index_col=[1,3],header=2,\
-                                         dtype={'Utility Number':np.int,'NERC Region':np.str}))}
+                                         dtype={'Utility Number':np.int,'NERC Region':np.str}))}# ,\
+#   not avail in 2012          #'dist_sys':(pd.read_excel(allfiles[i]['dist_sys'],sheet_name="Distribution_Systems_States",\
+#              #                              na_values =['.',' '],index_col=[1,3],header=1,\
+#               #                             dtype={'Utility Number':np.int}))}
 
 
 feat_year = ["2012","2013","2014","2015","2016"]
@@ -47,11 +55,11 @@ pred_year = ["2013","2014","2015","2016","2017"]
 discrete_vars = ['Ownership Type','NERC Region']
 for i in pred_year:
     alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
-    
+#THIS ISN'T ACTUALLY REPLACING ops data, NEED TO USE =    
 for i in feat_year:    
     alldata[i]['ops'].loc[slice(None),discrete_vars].fillna('Unknown',inplace=True)
 
-'''
+''' 
 Set up data as vectors of features
 Inputs:
    - Current year - Utility Name, NERC Region
@@ -65,7 +73,19 @@ Results:
 #Loop creates dict of cleaned up results for each year where SAIDI values exist and combines with data from ops file
 
 clean_res = {}
-features = ['Ownership Type','NERC Region', 'Total', 'Total Sources']
+cont_vars = ['Summer Peak Demand', 'Winter Peak Demand', 'Net Generation', \
+             'Wholesale Power Purchases', 'Exchange Energy Received',\
+             'Exchange Energy Delivered', 'Net Power Exchanged', 'Wheeled Power Received',\
+             'Wheeled Power Delivered', 'Net Wheeled Power', 'Transmission by Other Losses',\
+             'Total Sources', 'Retail Sales', 'Sales for Resale', 'Furnished without Charge',\
+             'Consumed by Respondent without Charge', 'Total Energy Losses',\
+             'Total Disposition', 'From Retail Sales', 'From Delivery Customers',\
+             'From Sales for Resale', 'From Credits or Adjustments', 'From Transmission', \
+             'From Other', 'Total']
+#consider adding loop to check for a threshold of response rates to include feature...
+#or rethink how nan values are being filled ^ model weight should account for this?
+features = discrete_vars + cont_vars
+#features = ['Ownership Type','NERC Region', 'Total', 'Total Sources']
 for i,yr in enumerate(pred_year):
     clean_data = alldata[yr]['rel'].\
     loc[np.isfinite(alldata[yr]['rel']['SAIDI With MED']),\
