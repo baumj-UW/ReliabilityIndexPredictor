@@ -108,18 +108,57 @@ Results:
 #Loop creates dict of cleaned up results for each year where SAIDI values exist and combines with data from ops file
 
 clean_res = {}
-cont_vars = ['Summer Peak Demand', 'Winter Peak Demand', 'Net Generation', \
-             'Wholesale Power Purchases', 'Exchange Energy Received',\
-             'Exchange Energy Delivered', 'Net Power Exchanged', 'Wheeled Power Received',\
-             'Wheeled Power Delivered', 'Net Wheeled Power', 'Transmission by Other Losses',\
-             'Total Sources', 'Retail Sales', 'Sales for Resale', 'Furnished without Charge',\
-             'Consumed by Respondent without Charge', 'Total Energy Losses',\
-             'Total Disposition', 'From Retail Sales', 'From Delivery Customers',\
-             'From Sales for Resale', 'From Credits or Adjustments', 'From Transmission', \
-             'From Other', 'Total']
+cont_vars = {'ops':['Summer Peak Demand', 'Winter Peak Demand', 'Net Generation', \
+                    'Wholesale Power Purchases', 'Exchange Energy Received',\
+                    'Exchange Energy Delivered', 'Net Power Exchanged', 'Wheeled Power Received',\
+                    'Wheeled Power Delivered', 'Net Wheeled Power', 'Transmission by Other Losses',\
+                    'Total Sources', 'Retail Sales', 'Sales for Resale', 'Furnished without Charge',\
+                    'Consumed by Respondent without Charge', 'Total Energy Losses',\
+                    'Total Disposition', 'From Retail Sales', 'From Delivery Customers',\
+                    'From Sales for Resale', 'From Credits or Adjustments', 'From Transmission', \
+                    'From Other', 'Total'],\
+             'net_mtr':['Residential', 'Commercial', \
+                        'Industrial', 'Transportation', 'Total', 'Residential.1', \
+                        'Commercial.1','Industrial.1', 'Transportation.1', 'Total.1',\
+                        'Residential.2','Commercial.2', 'Industrial.2', 'Transportation.2',\
+                        'Total.2','Residential.3', 'Commercial.3', 'Industrial.3', 'Transportation.3',\
+                        'Total.3', 'Residential.4', 'Commercial.4', 'Industrial.4','Transportation.4',\
+                        'Total.4', 'Residential.5', 'Commercial.5','Industrial.5', 'Transportation.5',\
+                        'Total.5', 'Residential.6','Commercial.6', 'Industrial.6', 'Transportation.6',\
+                        'Total.6', 'Residential.7', 'Commercial.7', 'Industrial.7', 'Transportation.7',\
+                        'Total.7', 'Residential.8', 'Commercial.8', 'Industrial.8','Transportation.8',\
+                        'Total.8', 'Residential.9', 'Commercial.9','Industrial.9', 'Transportation.9',\
+                        'Total.9', 'Residential.10','Commercial.10', 'Industrial.10', 'Transportation.10',\
+                        'Total.10','Residential.11', 'Commercial.11', 'Industrial.11', 'Transportation.11',\
+                        'Total.11'] }
+# cont_vars = ['Summer Peak Demand', 'Winter Peak Demand', 'Net Generation', \
+#              'Wholesale Power Purchases', 'Exchange Energy Received',\
+#              'Exchange Energy Delivered', 'Net Power Exchanged', 'Wheeled Power Received',\
+#              'Wheeled Power Delivered', 'Net Wheeled Power', 'Transmission by Other Losses',\
+#              'Total Sources', 'Retail Sales', 'Sales for Resale', 'Furnished without Charge',\
+#              'Consumed by Respondent without Charge', 'Total Energy Losses',\
+#              'Total Disposition', 'From Retail Sales', 'From Delivery Customers',\
+#              'From Sales for Resale', 'From Credits or Adjustments', 'From Transmission', \
+#              'From Other', 'Total']
+# ['Data Year', 'Utility Name', 'Residential', 'Commercial', 'Industrial',
+#        'Transportation', 'Total', 'Residential.1', 'Commercial.1',
+#        'Industrial.1', 'Transportation.1', 'Total.1', 'Residential.2',
+#        'Commercial.2', 'Industrial.2', 'Transportation.2', 'Total.2',
+#        'Residential.3', 'Commercial.3', 'Industrial.3', 'Transportation.3',
+#        'Total.3', 'Residential.4', 'Commercial.4', 'Industrial.4',
+#        'Transportation.4', 'Total.4', 'Residential.5', 'Commercial.5',
+#        'Industrial.5', 'Transportation.5', 'Total.5', 'Residential.6',
+#        'Commercial.6', 'Industrial.6', 'Transportation.6', 'Total.6',
+#        'Residential.7', 'Commercial.7', 'Industrial.7', 'Transportation.7',
+#        'Total.7', 'Residential.8', 'Commercial.8', 'Industrial.8',
+#        'Transportation.8', 'Total.8', 'Residential.9', 'Commercial.9',
+#        'Industrial.9', 'Transportation.9', 'Total.9', 'Residential.10',
+#        'Commercial.10', 'Industrial.10', 'Transportation.10', 'Total.10',
+#        'Residential.11', 'Commercial.11', 'Industrial.11', 'Transportation.11',
+#        'Total.11']
 #consider adding loop to check for a threshold of response rates to include feature...
 #or rethink how nan values are being filled ^ model weight should account for this?
-features = discrete_vars + cont_vars
+features = discrete_vars + cont_vars['ops']
 #features = ['Ownership Type','NERC Region', 'Total', 'Total Sources']
 for i,yr in enumerate(pred_year):
     clean_data = alldata[yr]['rel'].\
@@ -128,6 +167,8 @@ for i,yr in enumerate(pred_year):
     
     for feat in features:
         clean_data[feat] = alldata[feat_year[i]]['ops'].loc[clean_data.index,feat]
+    for feat in cont_vars['net_mtr']:
+        clean_data['net_mtr_'+feat] = alldata[feat_year[i]]['net_mtr'].loc[clean_data.index,feat]
     clean_res[yr] = clean_data.copy()
     #
     #this adds prev year SAIDI value, need to figure out how to handle 2012...
@@ -135,7 +176,6 @@ for i,yr in enumerate(pred_year):
 
 #handle categories (uses code method from HW2 solutions)
 #need to make a list of categories to convert
-
 names = []
 # for var in discrete_vars:
 #     encoder = LabelEncoder()
