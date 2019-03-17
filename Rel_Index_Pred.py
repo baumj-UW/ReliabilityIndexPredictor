@@ -332,6 +332,54 @@ val_MAE = metrics.median_absolute_error(val_actual.values, val_pred)
 print("Validation MSE:",val_MSE)  #Validation MSE: 230590.00718307553
 print("Validation Med. Abs Err:",val_MAE)
 
+
+'''
+Lasso Model
+starter code by HW2 solutions
+'''
+def GetError(model,data,scaler,actual):
+    X = scaler.transform(data)
+    preds = model.predict(X)
+    mse = metrics.mean_squared_error(actual, preds)
+    mae = metrics.median_absolute_error(actual, preds)
+    return mse, mae
+
+scaler = preprocessing.StandardScaler()
+data_scaled = scaler.fit_transform(data)
+
+models = []
+train_errs = []
+train_mae_errs = []
+val_errs = []
+val_mae_errs = []
+#non_zeros = []
+alphas = np.linspace(0.1,10,num=50)
+for alpha in alphas:
+    model = linear_model.Lasso(alpha=alpha, normalize=False, max_iter=5000)
+    model.fit(data_scaled,actual)
+#     
+#     coef = model.coef_
+#     num_zero = (coef == 0.0).sum()
+#     non_zero = X.shape[1] - num_zero
+#     non_zeros.append(non_zero)
+#     
+    val_mse,val_mae = GetError(model, val_data, scaler,val_actual)
+    train_mse,train_mae = GetError(model, data, scaler,actual)
+    
+    train_errs.append(train_mse)
+    train_mae_errs.append(train_mae)
+    val_errs.append(val_mse)
+    val_mae_errs.append(val_mae)
+    models.append(model)
+    print(alpha, val_mse, val_mae)
+#From HW2 Solution
+
+plt.plot(alphas,train_errs) #why does this increase...?
+plt.plot(alphas,val_errs)
+
+plt.plot(alphas,val_mae_errs)
+plt.plot(alphas,train_mae_errs)
+    
 print("Finished yet?")
 '''
 Extra tests  and code
