@@ -108,7 +108,7 @@ Results:
 #Loop creates dict of cleaned up results for each year where SAIDI values exist and combines with data from ops file
 
 clean_res = {}
-cont_vars = {'ops':['Summer Peak Demand', 'Winter Peak Demand', 'Net Generation', \
+cont_vars = {'ops':['Data Year','Summer Peak Demand', 'Winter Peak Demand', 'Net Generation', \
                     'Wholesale Power Purchases', 'Exchange Energy Received',\
                     'Exchange Energy Delivered', 'Net Power Exchanged', 'Wheeled Power Received',\
                     'Wheeled Power Delivered', 'Net Wheeled Power', 'Transmission by Other Losses',\
@@ -130,7 +130,8 @@ cont_vars = {'ops':['Summer Peak Demand', 'Winter Peak Demand', 'Net Generation'
                         'Total.8', 'Residential.9', 'Commercial.9','Industrial.9', 'Transportation.9',\
                         'Total.9', 'Residential.10','Commercial.10', 'Industrial.10', 'Transportation.10',\
                         'Total.10','Residential.11', 'Commercial.11', 'Industrial.11', 'Transportation.11',\
-                        'Total.11'] }
+                        'Total.11']}
+           
 # cont_vars = ['Summer Peak Demand', 'Winter Peak Demand', 'Net Generation', \
 #              'Wholesale Power Purchases', 'Exchange Energy Received',\
 #              'Exchange Energy Delivered', 'Net Power Exchanged', 'Wheeled Power Received',\
@@ -163,7 +164,7 @@ features = discrete_vars + cont_vars['ops']
 for i,yr in enumerate(pred_year):
     clean_data = alldata[yr]['rel'].\
     loc[np.isfinite(alldata[yr]['rel']['SAIDI With MED']),\
-        ['SAIDI With MED','SAIFI With MED']] #only keep indices samples that have results
+        ['SAIDI With MED','SAIFI With MED','Number of Customers']] #only keep indices samples that have results
     
     for feat in features:
         clean_data[feat] = alldata[feat_year[i]]['ops'].loc[clean_data.index,feat]
@@ -185,9 +186,13 @@ names = []
 
 #this should just do the fit based on known categories
 hotenc = OneHotEncoder(handle_unknown='ignore')
-X = hotenc.fit_transform(clean_res["2013"][discrete_vars].fillna("Unknown").values)
+disc_combo = clean_res["2013"][discrete_vars].append(clean_res["2014"][discrete_vars].\
+                                                     append(clean_res["2015"][discrete_vars]))
+X = hotenc.fit(disc_combo.fillna("Unknown").values)
+#X = hotenc.fit_transform(clean_res["2013"][discrete_vars].fillna("Unknown").values)
 for (i,feat) in enumerate(hotenc.categories_):
     names += [(discrete_vars[i]+'_'+cat) for cat in feat]
+
 
 # df_disc = pd.DataFrame(X.todense(),columns=names,index=clean_res["2013"].index) #combine this df with clean_res
 # #test = 
@@ -200,7 +205,7 @@ for yr in clean_res:
     df_disc = pd.DataFrame(X.todense(),columns=names,index=clean_res[yr].index)
     combo = pd.concat([clean_res[yr],df_disc],axis=1,join_axes=[clean_res[yr].index])
     clean_res[yr] = combo.drop(discrete_vars,axis=1)   
-    
+
 
 # for i in enumerate(pred_year):
 #     clean_data = alldata[i]['rel'].loc[np.isfinite(alldata[i]['rel']['SAIDI With MED']),\
@@ -226,6 +231,16 @@ basic_MSE = metrics.mean_squared_error(val_actual.values.reshape(-1,1), worst)
 basic_MAE = metrics.median_absolute_error(val_actual.values.reshape(-1,1), worst)
 print("Worst case MSE:",basic_MSE)
 print("Worst case MAE:",basic_MAE)
+
+
+#quick test to check baseline for predicting the utilities prev year SAIDI
+test14 = clean_res['2014'].copy()
+test15 = clean_res['2015'].copy()
+testcombo = pd.concat([test14,test15],axis=1,join_axes=[test14.index])
+test_act = testcombo['SAIDI With MED'].values[:,0]
+test_pred = testcombo['SAIDI With MED'].fillna(0).values[:,1]
+metrics.mean_squared_error(test_act, test_pred) #548292.735939868
+metrics.median_absolute_error(test_act, test_pred) #48.058499999999995
 ''' 
 Get Baseline Predictor:
 Use utility region's average SAIDI and SAIFI values from the previous year
@@ -353,9 +368,9 @@ train_mae_errs = []
 val_errs = []
 val_mae_errs = []
 #non_zeros = []
-alphas = np.linspace(0.1,10,num=50)
+alphas = list(np.linspace(0.001,1,num=25))+list(np.linspace(1,50,num=25))+list(np.linspace(50,200,num=25))
 for alpha in alphas:
-    model = linear_model.Lasso(alpha=alpha, normalize=False, max_iter=5000)
+    model = linear_model.Lasso(alpha=alpha, normalize=False, max_iter=1000)
     model.fit(data_scaled,actual)
 #     
 #     coef = model.coef_
@@ -373,13 +388,63 @@ for alpha in alphas:
     models.append(model)
     print(alpha, val_mse, val_mae)
 #From HW2 Solution
-
+plt.figure()
 plt.plot(alphas,train_errs) #why does this increase...?
 plt.plot(alphas,val_errs)
+plt.title("RMSEs for Lasso")
 
-plt.plot(alphas,val_mae_errs)
+plt.figure()
 plt.plot(alphas,train_mae_errs)
+plt.plot(alphas,val_mae_errs)
+plt.title("Med Abs for Lasso")
+
+#features with highest weight
+print(data.columns[np.nonzero(models[33].coef_)])
+# Unscaling the parameters to see which coefficients have the biggest impact
+rows = []
+model=models[33]
+for (c, scale, mu, n) in zip(model.coef_, scaler.scale_, scaler.mean_, list(val_data.columns.values)):
+    rows.append({'name': n, 'scale': scale, 'coef': c, 'mean': mu})
+result = pd.DataFrame(rows)
+
+result['x'] = result.coef / result.scale
+print(result.loc[:,['coef','name']].sort_values(by='coef')[:5])
+print(result.loc[:,['coef','name']].sort_values(by='coef',ascending=False)[:5])
+#try repeating for Ridge model
+models = []
+train_errs = []
+train_mae_errs = []
+val_errs = []
+val_mae_errs = []
+#non_zeros = []
+alphas = list(np.linspace(0.001,1,num=25))+list(np.linspace(1,100,num=25))+list(np.linspace(100,1000,num=25))
+for alpha in alphas:
+    model = linear_model.Ridge(alpha=alpha, normalize=False, max_iter=1000)
+    model.fit(data_scaled,actual)
+   
+    val_mse,val_mae = GetError(model, val_data, scaler,val_actual)
+    train_mse,train_mae = GetError(model, data, scaler,actual)
     
+    train_errs.append(train_mse)
+    train_mae_errs.append(train_mae)
+    val_errs.append(val_mse)
+    val_mae_errs.append(val_mae)
+    models.append(model)
+    print(alpha, val_mse, val_mae)    
+    
+plt.figure()
+plt.plot(alphas,train_errs) #why does this increase...?
+plt.plot(alphas,val_errs)
+plt.title("RMSEs for Ridge")
+
+plt.figure()
+plt.plot(alphas,train_mae_errs)
+plt.plot(alphas,val_mae_errs)
+plt.title("Med Abs for Ridge")   
+ 
+print("Highest weight:", data.columns[np.argmax(models[57].coef_)]) 
+print("Lowest weight:", data.columns[np.argmin(models[57].coef_)])
+ 
 print("Finished yet?")
 '''
 Extra tests  and code
