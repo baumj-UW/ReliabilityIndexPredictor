@@ -90,6 +90,9 @@ for i in pred_year:
 discrete_vars = ['Ownership Type','NERC Region']
 for i in pred_year:
     alldata[i]['rel']['SAIDI With MED'].fillna(alldata[i]['rel']['SAIDI With MED.1'],inplace=True)
+    alldata[i]['rel']['SAIDI Without MED'].fillna(alldata[i]['rel']['SAIDI Without MED.1'],inplace=True)
+    alldata[i]['rel']['SAIFI With MED'].fillna(alldata[i]['rel']['SAIFI With MED.1'],inplace=True)
+    alldata[i]['rel']['SAIFI Without MED'].fillna(alldata[i]['rel']['SAIFI Without MED.1'],inplace=True)
 #THIS ISN'T ACTUALLY REPLACING ops data, NEED TO USE =    
 for i in feat_year:    
     alldata[i]['ops'].loc[slice(None),discrete_vars].fillna('Unknown',inplace=True)
@@ -164,7 +167,7 @@ features = discrete_vars + cont_vars['ops']
 for i,yr in enumerate(pred_year):
     clean_data = alldata[yr]['rel'].\
     loc[np.isfinite(alldata[yr]['rel']['SAIDI With MED']),\
-        ['SAIDI With MED','SAIFI With MED','Number of Customers']] #only keep indices samples that have results
+        ['SAIDI With MED','SAIFI With MED','SAIDI Without MED','SAIFI Without MED','Number of Customers']] #only keep indices samples that have results
     
     for feat in features:
         clean_data[feat] = alldata[feat_year[i]]['ops'].loc[clean_data.index,feat]
@@ -241,6 +244,43 @@ test_act = testcombo['SAIDI With MED'].values[:,0]
 test_pred = testcombo['SAIDI With MED'].fillna(0).values[:,1]
 metrics.mean_squared_error(test_act, test_pred) #548292.735939868
 metrics.median_absolute_error(test_act, test_pred) #48.058499999999995
+
+#plot mean/var of each year to understand underlying trends
+avg_saidi_MED = {yr:np.average(clean_res[yr].loc[:,'SAIDI With MED']) for yr in pred_year}
+var_saidi_MED = {yr:np.var(clean_res[yr].loc[:,'SAIDI With MED']) for yr in pred_year}
+avg_saidi = {yr:np.nanmean(clean_res[yr].loc[:,'SAIDI Without MED']) for yr in pred_year}
+var_saidi = {yr:np.nanvar(clean_res[yr].loc[:,'SAIDI Without MED']) for yr in pred_year}
+plt.figure()
+plt.errorbar(avg_saidi_MED.keys(), avg_saidi_MED.values(), \
+             yerr=[avg_saidi_MED.values(),var_saidi_MED.values()], fmt='o',capthick=5,ecolor='g')
+plt.title("Annual SAIDI With MED Mean and Variance")
+plt.yscale("log")
+plt.ylim([1e0,2e6])
+
+plt.figure()
+plt.errorbar(avg_saidi.keys(), avg_saidi.values(), \
+             yerr=[avg_saidi.values(),var_saidi.values()], fmt='o',capthick=5,ecolor='g')
+plt.title("Annual SAIDI without MED Mean and Variance")
+plt.yscale("log")
+plt.ylim([1e0,2e6])
+
+OUTLIER = 720
+lim_index = {yr:(clean_res[yr][clean_res[yr]['SAIDI With MED']<OUTLIER].index) for yr in pred_year}
+avg_saidi_MED = {yr:np.average(clean_res[yr].loc[lim_index[yr],'SAIDI With MED']) for yr in pred_year}
+var_saidi_MED = {yr:np.var(clean_res[yr].loc[lim_index[yr],'SAIDI With MED']) for yr in pred_year}
+plt.figure()
+plt.errorbar(avg_saidi_MED.keys(), avg_saidi_MED.values(), \
+             yerr=[avg_saidi_MED.values(),var_saidi_MED.values()], fmt='o',capthick=5,ecolor='g')
+plt.title("Limited Annual SAIDI with MED Mean and Variance")
+
+
+lim_index = {yr:(clean_res[yr][clean_res[yr]['SAIDI Without MED']<OUTLIER].index) for yr in pred_year}
+avg_saidi = {yr:np.average(clean_res[yr].loc[lim_index[yr],'SAIDI Without MED']) for yr in pred_year}
+var_saidi = {yr:np.var(clean_res[yr].loc[lim_index[yr],'SAIDI Without MED']) for yr in pred_year}
+plt.figure()
+plt.errorbar(avg_saidi.keys(), avg_saidi.values(), \
+             yerr=[avg_saidi.values(),var_saidi.values()], fmt='o',capthick=5,ecolor='g')
+plt.title("Limited Annual SAIDI without MED Mean and Variance")
 ''' 
 Get Baseline Predictor:
 Use utility region's average SAIDI and SAIFI values from the previous year
