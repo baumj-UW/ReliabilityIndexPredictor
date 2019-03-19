@@ -368,18 +368,33 @@ print("Simple Reg case MSE:",basic_MSE)
 '''
 Convert categorical data to one-hot vectors 
 and include in training set
+
+Limit outliers
 '''
-data = clean_res['2013'].iloc[:,2:].fillna(0).\
-append(clean_res['2014'].iloc[:,2:].fillna(0))
-actual = clean_res['2013'].loc[:,'SAIDI With MED'].\
-append(clean_res['2014'].loc[:,'SAIDI With MED'])
+OUTLIER = 720
+lim_index = {yr:(clean_res[yr][clean_res[yr]['SAIDI With MED']<OUTLIER].index) for yr in pred_year}
+# avg_saidi_MED = {yr:np.average(clean_res[yr].loc[lim_index[yr],'SAIDI With MED']) for yr in pred_year}
+# var_saidi_MED = {yr:np.var(clean_res[yr].loc[lim_index[yr],'SAIDI With MED']) for yr in pred_year}
+
+data = clean_res['2013'].loc[lim_index['2013'],:].\
+append(clean_res['2014'].loc[lim_index['2014'],:])
+
+data = data.drop(['SAIDI With MED','SAIFI With MED','SAIDI Without MED',\
+                  'SAIFI Without MED'],axis='columns').fillna(0)
+
+actual = clean_res['2013'].loc[lim_index['2013'],'SAIDI With MED'].\
+append(clean_res['2014'].loc[lim_index['2014'],'SAIDI With MED'])
+
 
 
 model = linear_model.LinearRegression(normalize=True)
 model.fit(data.values,actual.values)
 
-val_data = clean_res['2015'].iloc[:,2:].fillna(0)
-val_actual = clean_res['2015'].loc[:,'SAIDI With MED']
+val_data = clean_res['2015'].loc[lim_index['2015'],:]
+val_data = val_data.drop(['SAIDI With MED','SAIFI With MED','SAIDI Without MED',\
+                  'SAIFI Without MED'],axis='columns').fillna(0)
+
+val_actual = clean_res['2015'].loc[lim_index['2015'],'SAIDI With MED']
 val_pred = model.predict(val_data.values)
 
 val_MSE = metrics.mean_squared_error(val_actual.values, val_pred)
@@ -393,8 +408,8 @@ Lasso Model
 starter code by HW2 solutions
 '''
 def GetError(model,data,scaler,actual):
-    X = scaler.transform(data)
-    preds = model.predict(X)
+    scaled_data = scaler.transform(data)
+    preds = model.predict(scaled_data)
     mse = metrics.mean_squared_error(actual, preds)
     mae = metrics.median_absolute_error(actual, preds)
     return mse, mae
@@ -402,13 +417,14 @@ def GetError(model,data,scaler,actual):
 scaler = preprocessing.StandardScaler()
 data_scaled = scaler.fit_transform(data)
 
-models = []
+lasso_models = []
 train_errs = []
 train_mae_errs = []
 val_errs = []
 val_mae_errs = []
 #non_zeros = []
-alphas = list(np.linspace(0.001,1,num=25))+list(np.linspace(1,50,num=25))+list(np.linspace(50,200,num=25))
+alphas = list(np.linspace(0.01,1,num=25))+list(np.linspace(1,5,num=25))\
++list(np.linspace(5,50,num=25))#+list(np.linspace(25,200,num=25))
 for alpha in alphas:
     model = linear_model.Lasso(alpha=alpha, normalize=False, max_iter=1000)
     model.fit(data_scaled,actual)
@@ -425,13 +441,16 @@ for alpha in alphas:
     train_mae_errs.append(train_mae)
     val_errs.append(val_mse)
     val_mae_errs.append(val_mae)
-    models.append(model)
+    lasso_models.append(model)
     print(alpha, val_mse, val_mae)
 #From HW2 Solution
 plt.figure()
-plt.plot(alphas,train_errs) #why does this increase...?
-plt.plot(alphas,val_errs)
+plt.plot(alphas,train_errs,label="Train") #why does this increase...?
+plt.plot(alphas,val_errs,label="Validation")
 plt.title("RMSEs for Lasso")
+plt.xlabel("Weight [lambda]")
+plt.ylabel("RMSE (minutes)")
+plt.legend()
 
 plt.figure()
 plt.plot(alphas,train_mae_errs)
@@ -439,10 +458,10 @@ plt.plot(alphas,val_mae_errs)
 plt.title("Med Abs for Lasso")
 
 #features with highest weight
-print(data.columns[np.nonzero(models[33].coef_)])
+print(data.columns[np.nonzero(lasso_models[33].coef_)])
 # Unscaling the parameters to see which coefficients have the biggest impact
 rows = []
-model=models[33]
+model=lasso_models[33]
 for (c, scale, mu, n) in zip(model.coef_, scaler.scale_, scaler.mean_, list(val_data.columns.values)):
     rows.append({'name': n, 'scale': scale, 'coef': c, 'mean': mu})
 result = pd.DataFrame(rows)
@@ -451,7 +470,7 @@ result['x'] = result.coef / result.scale
 print(result.loc[:,['coef','name']].sort_values(by='coef')[:5])
 print(result.loc[:,['coef','name']].sort_values(by='coef',ascending=False)[:5])
 #try repeating for Ridge model
-models = []
+ridge_models = []
 train_errs = []
 train_mae_errs = []
 val_errs = []
@@ -469,7 +488,7 @@ for alpha in alphas:
     train_mae_errs.append(train_mae)
     val_errs.append(val_mse)
     val_mae_errs.append(val_mae)
-    models.append(model)
+    ridge_models.append(model)
     print(alpha, val_mse, val_mae)    
     
 plt.figure()
@@ -482,8 +501,40 @@ plt.plot(alphas,train_mae_errs)
 plt.plot(alphas,val_mae_errs)
 plt.title("Med Abs for Ridge")   
  
-print("Highest weight:", data.columns[np.argmax(models[57].coef_)]) 
-print("Lowest weight:", data.columns[np.argmin(models[57].coef_)])
+print("Highest weight:", data.columns[np.argmax(ridge_models[57].coef_)]) 
+print("Lowest weight:", data.columns[np.argmin(ridge_models[57].coef_)])
+
+
+
+'''
+Finally run tuned model against test data
+'''
+model = lasso_models[33]
+# 
+# test_data = clean_res['2016'].iloc[:,4:].fillna(0).\
+# append(clean_res['2017'].iloc[:,4:].fillna(0))
+# test_actual = clean_res['2016'].loc[:,'SAIDI With MED'].\
+# append(clean_res['2017'].loc[:,'SAIDI With MED'])
+
+test16_data = clean_res['2016'].loc[lim_index['2016'],:]
+test16_data = test16_data.drop(['SAIDI With MED','SAIFI With MED','SAIDI Without MED',\
+                  'SAIFI Without MED'],axis='columns').fillna(0)
+test16_actual = clean_res['2016'].loc[lim_index['2016'],'SAIDI With MED']
+
+                  
+test17_data = clean_res['2017'].loc[lim_index['2017'],:]
+test17_data = test17_data.drop(['SAIDI With MED','SAIFI With MED','SAIDI Without MED',\
+                  'SAIFI Without MED'],axis='columns').fillna(0)
+
+test17_actual = clean_res['2017'].loc[lim_index['2017'],'SAIDI With MED']
+
+
+test16_mse,test16_mae = GetError(model, test16_data, scaler,test16_actual)
+test17_mse,test17_mae = GetError(model, test17_data, scaler,test17_actual)
+
+print("2016 Test RMSE:",test16_mse)
+print("2017 Test RMSE:",test17_mse)
+
  
 print("Finished yet?")
 '''
